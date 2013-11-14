@@ -1,4 +1,6 @@
 import csv
+import os.path
+from string import center
 
 def distance(a, b):
     result = 0;
@@ -6,7 +8,7 @@ def distance(a, b):
         result += (a[i] - b[i]) ** 2;
     return result;
 
-def center(Sequence):
+def calculateCenter(Sequence):
     tX = tY = tZ = 0
     l = len(Sequence)
     for (X, Y, Z) in Sequence:
@@ -19,46 +21,68 @@ def center(Sequence):
     return (tX, tY, tZ)
 
 if __name__ == '__main__':
-    print 'reading train.csv...'
-    trainReader = csv.reader(open('train.csv', 'r'))
-    trainReader.next()
-
-    trainDict = {}
-    for [T, X, Y, Z, DeviceId] in trainReader:
-        if not trainDict.has_key(DeviceId):
-            trainDict[DeviceId] = [];
-        trainDict[DeviceId].append((float(X), float(Y), float(Z)))
-    
-    print 'calculate with train...'    
     trainCenter = {}
-    for (DeviceId, acceleration) in trainDict.iteritems():
-        trainCenter[DeviceId] = center(acceleration)
-        
-    print 'reading test.csv...'
-    testReader = csv.reader(open('test.csv', 'r'))
-    testReader.next();
+    if os.path.exists('trainCenter.csv'):
+        trainReader = csv.reader(open('trainCenter.csv', 'r'))
+        for [DeviceId, X, Y, Z] in trainReader:
+            trainCenter[DeviceId] = (float(X), float(Y), float(Z))
+    else:
+        print 'reading train.csv...'
+        trainReader = csv.reader(open('train.csv', 'r'))
+        trainReader.next()
     
-    testDict = {}
-    for [T, X, Y, Z, SequenceId] in testReader:
-        if not testDict.has_key(SequenceId):
-            testDict[SequenceId] = [];
-        testDict[SequenceId].append((float(X), float(Y), float(Z)))
+        trainDict = {}
+        for [T, X, Y, Z, DeviceId] in trainReader:
+            if not trainDict.has_key(DeviceId):
+                trainDict[DeviceId] = [];
+            trainDict[DeviceId].append((float(X), float(Y), float(Z)))
         
-    print 'calculate with test...'    
+        print 'calculate with train...'    
+        for (DeviceId, acceleration) in trainDict.iteritems():
+            trainCenter[DeviceId] = calculateCenter(acceleration)
+        
+        trainCenterFile = open('trainCenter.csv', 'w')
+        trainWriter = csv.writer(trainCenterFile)
+        for (DeviceId, center) in trainCenter.iteritems():
+            trainWriter.writerow([DeviceId] + list(center))
+        trainCenterFile.close()
+        
     testCenter = {}
-    for (SequenceId, acceleration) in testDict.iteritems():
-        testCenter[SequenceId] = center(acceleration)
+    if os.path.exists('testCenter.csv'):
+        testReader = csv.reader(open('testCenter.csv', 'r'))
+        for [SequenceId, X, Y, Z] in testReader:
+            testCenter[SequenceId] = (float(X), float(Y), float(Z))
+    else:
+        print 'reading test.csv...'
+        testReader = csv.reader(open('test.csv', 'r'))
+        testReader.next();
+        
+        testDict = {}
+        for [T, X, Y, Z, SequenceId] in testReader:
+            if not testDict.has_key(SequenceId):
+                testDict[SequenceId] = [];
+            testDict[SequenceId].append((float(X), float(Y), float(Z)))
+            
+        print 'calculate with test...'    
+        for (SequenceId, acceleration) in testDict.iteritems():
+            testCenter[SequenceId] = calculateCenter(acceleration)
+        
+        testCenterFile = open('testCenter.csv', 'w')
+        testWriter = csv.writer(testCenterFile)
+        for (SequenceId, center) in testCenter.iteritems():
+            testWriter.writerow([SequenceId] + list(center))
+        testCenterFile.close()
     
     print 'reading question.csv...'
     questionReader = csv.reader(open('questions.csv', 'r'))
     questionReader.next()
     
     submissionWriter = csv.writer(open('submisson.csv', 'w'))
-    submissionWriter.writerow(['QuestionId', 'IsTrue']);
+    submissionWriter.writerow(['QuestionId', 'IsTrue'])
     
     print 'fucking busy...'
     for [QuestionId, SequenceId, QuizDevice] in questionReader:
-        score = -distance(testCenter[SequenceId], trainCenter[QuizDevice]);
+        score = -distance(testCenter[SequenceId], trainCenter[QuizDevice])
         submissionWriter.writerow([QuestionId, score])
         print 'solved %s, %f' % (QuestionId, score)
     
