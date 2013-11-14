@@ -6,28 +6,17 @@ def distance(a, b):
         result += (a[i] - b[i]) ** 2;
     return result;
 
-def predict(SequenceId, QuizDevice):
-    result = -1;
-    
-    tX = 0
-    tY = 0
-    tZ = 0
-    
-    for a in testDict[SequenceId]:
-        tX += a[0]
-        tY += a[1]
-        tZ += a[2]
-    
-    l = len(testDict[SequenceId])
+def center(Sequence):
+    tX = tY = tZ = 0
+    l = len(Sequence)
+    for (X, Y, Z) in Sequence:
+        tX += X
+        tY += Y
+        tZ += Z
     tX /= l
     tY /= l
     tZ /= l
-    
-    for b in trainDict[QuizDevice]:
-        d = distance((tX, tY, tZ), b)
-        if result < 0 or d < result:
-            result = d;
-    return result;
+    return (tX, tY, tZ)
 
 if __name__ == '__main__':
     print 'reading train.csv...'
@@ -39,6 +28,11 @@ if __name__ == '__main__':
         if not trainDict.has_key(DeviceId):
             trainDict[DeviceId] = [];
         trainDict[DeviceId].append((float(X), float(Y), float(Z)))
+    
+    print 'calculate with train...'    
+    trainCenter = {}
+    for (DeviceId, acceleration) in trainDict.iteritems():
+        trainCenter[DeviceId] = center(acceleration)
         
     print 'reading test.csv...'
     testReader = csv.reader(open('test.csv', 'r'))
@@ -49,6 +43,11 @@ if __name__ == '__main__':
         if not testDict.has_key(SequenceId):
             testDict[SequenceId] = [];
         testDict[SequenceId].append((float(X), float(Y), float(Z)))
+        
+    print 'calculate with test...'    
+    testCenter = {}
+    for (SequenceId, acceleration) in testDict.iteritems():
+        testCenter[SequenceId] = center(acceleration)
     
     print 'reading question.csv...'
     questionReader = csv.reader(open('questions.csv', 'r'))
@@ -59,10 +58,11 @@ if __name__ == '__main__':
     
     print 'fucking busy...'
     for [QuestionId, SequenceId, QuizDevice] in questionReader:
-        score = -predict(SequenceId, QuizDevice)
+        score = -distance(testCenter[SequenceId], trainCenter[QuizDevice]);
         submissionWriter.writerow([QuestionId, score])
         print 'solved %s, %f' % (QuestionId, score)
     
+    print 'done!'
     
     
     
