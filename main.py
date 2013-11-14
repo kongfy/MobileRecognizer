@@ -3,10 +3,10 @@ import os.path
 from string import center
 
 def distance(a, b):
-    result = 0;
+    result = 0
     for i in range(3):
-        result += (a[i] - b[i]) ** 2;
-    return result;
+        result += (a[i] - b[i]) ** 2
+    return result
 
 def calculateCenter(Sequence):
     tX = tY = tZ = 0
@@ -20,7 +20,18 @@ def calculateCenter(Sequence):
     tZ /= l
     return (tX, tY, tZ)
 
+def predict(SequenceId, QuizDevice):
+    distances = [distance(testCenter[SequenceId], p) for p in trainCenter.itervalues()]
+    limit = distance(testCenter[SequenceId], trainCenter[QuizDevice])
+    
+    count = 0
+    for d in distances:
+        if d >= limit:
+            count += 1
+    return count
+
 if __name__ == '__main__':
+    global trainCenter
     trainCenter = {}
     if os.path.exists('trainCenter.csv'):
         trainReader = csv.reader(open('trainCenter.csv', 'r'))
@@ -34,7 +45,7 @@ if __name__ == '__main__':
         trainDict = {}
         for [T, X, Y, Z, DeviceId] in trainReader:
             if not trainDict.has_key(DeviceId):
-                trainDict[DeviceId] = [];
+                trainDict[DeviceId] = []
             trainDict[DeviceId].append((float(X), float(Y), float(Z)))
         
         print 'calculate with train...'    
@@ -47,6 +58,7 @@ if __name__ == '__main__':
             trainWriter.writerow([DeviceId] + list(center))
         trainCenterFile.close()
         
+    global testCenter
     testCenter = {}
     if os.path.exists('testCenter.csv'):
         testReader = csv.reader(open('testCenter.csv', 'r'))
@@ -55,12 +67,12 @@ if __name__ == '__main__':
     else:
         print 'reading test.csv...'
         testReader = csv.reader(open('test.csv', 'r'))
-        testReader.next();
+        testReader.next()
         
         testDict = {}
         for [T, X, Y, Z, SequenceId] in testReader:
             if not testDict.has_key(SequenceId):
-                testDict[SequenceId] = [];
+                testDict[SequenceId] = []
             testDict[SequenceId].append((float(X), float(Y), float(Z)))
             
         print 'calculate with test...'    
@@ -82,9 +94,9 @@ if __name__ == '__main__':
     
     print 'fucking busy...'
     for [QuestionId, SequenceId, QuizDevice] in questionReader:
-        score = -distance(testCenter[SequenceId], trainCenter[QuizDevice])
+        score = predict(SequenceId, QuizDevice)
         submissionWriter.writerow([QuestionId, score])
-        print 'solved %s, %f' % (QuestionId, score)
+        print 'solved %s, %d' % (QuestionId, score)
     
     print 'done!'
     
