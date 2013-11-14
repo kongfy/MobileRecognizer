@@ -21,9 +21,22 @@ def calculateCenter(Sequence):
     return (tX, tY, tZ)
 
 def predict(SequenceId, QuizDevice):
-    distances = [distance(testCenter[SequenceId], p) for p in trainCenter.itervalues()]
-    limit = distance(testCenter[SequenceId], trainCenter[QuizDevice])
     
+    distances = []
+    for a in trainCenter.itervalues():
+        temp = -1
+        for b in testDict[SequenceId]:
+            d = distance(a, b)
+            if temp < 0 or d < temp:
+                temp = d
+        distances.append(temp)
+    
+    limit = -1
+    for a in testDict[SequenceId]:
+        d = distance(a, trainCenter[QuizDevice])
+        if limit < 0 or d < limit:
+            limit = d;
+        
     count = 0
     for d in distances:
         if d >= limit:
@@ -58,32 +71,16 @@ if __name__ == '__main__':
             trainWriter.writerow([DeviceId] + list(center))
         trainCenterFile.close()
         
-    global testCenter
-    testCenter = {}
-    if os.path.exists('testCenter.csv'):
-        testReader = csv.reader(open('testCenter.csv', 'r'))
-        for [SequenceId, X, Y, Z] in testReader:
-            testCenter[SequenceId] = (float(X), float(Y), float(Z))
-    else:
-        print 'reading test.csv...'
-        testReader = csv.reader(open('test.csv', 'r'))
-        testReader.next()
-        
-        testDict = {}
-        for [T, X, Y, Z, SequenceId] in testReader:
-            if not testDict.has_key(SequenceId):
-                testDict[SequenceId] = []
-            testDict[SequenceId].append((float(X), float(Y), float(Z)))
-            
-        print 'calculate with test...'    
-        for (SequenceId, acceleration) in testDict.iteritems():
-            testCenter[SequenceId] = calculateCenter(acceleration)
-        
-        testCenterFile = open('testCenter.csv', 'w')
-        testWriter = csv.writer(testCenterFile)
-        for (SequenceId, center) in testCenter.iteritems():
-            testWriter.writerow([SequenceId] + list(center))
-        testCenterFile.close()
+    print 'reading test.csv...'
+    testReader = csv.reader(open('test.csv', 'r'))
+    testReader.next()
+    
+    global testDict
+    testDict = {}
+    for [T, X, Y, Z, SequenceId] in testReader:
+        if not testDict.has_key(SequenceId):
+            testDict[SequenceId] = []
+        testDict[SequenceId].append((float(X), float(Y), float(Z)))
     
     print 'reading question.csv...'
     questionReader = csv.reader(open('questions.csv', 'r'))
@@ -99,7 +96,5 @@ if __name__ == '__main__':
         print 'solved %s, %d' % (QuestionId, score)
     
     print 'done!'
-    
-    
-    
+
     
