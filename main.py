@@ -8,6 +8,8 @@ import csv
 import os.path
 import math
 from NaiveBayes import NaiveBayes
+import cPickle
+import sys
 
 def calculateCenter(Sequence):
     tX = tY = tZ = 0
@@ -39,12 +41,23 @@ def calculateStdev(Sequence, mean):
 def calculateInfo(Sequence):
     result = {}
     result['mean'] = calculateCenter(Sequence)
-    result['stdev'] = calculateStdev(Sequence, result['mean'])
+#    result['stdev'] = calculateStdev(Sequence, result['mean'])
     result['count'] = len(Sequence)
     result['start_time'] = Sequence[0][0]
     result['end_time'] = Sequence[len(Sequence) - 1][0]
     
     return result
+
+def countSequence(Sequence):
+    cX = {}
+    cY = {}
+    cZ = {}
+    for (T, X, Y, Z) in Sequence:
+        cX[X] = cX.get(X, 0) + 1
+        cY[Y] = cY.get(Y, 0) + 1
+        cZ[Z] = cZ.get(Z, 0) + 1
+    
+    return (cX, cY, cZ)
 
 def predict(Sample, QuizDevice):
     plist = []
@@ -61,16 +74,8 @@ def predict(Sample, QuizDevice):
 if __name__ == '__main__':
     global trainInfo
     trainInfo = {}
-    if os.path.exists('trainInfo.csv'):
-        trainReader = csv.reader(open('trainInfo.csv', 'r'))
-        for [DeviceId, meanX, meanY, meanZ, stdevX, stdevY, stdevZ, count, startTime, endTime] in trainReader:
-            trainInfo[DeviceId] = {'mean' : (float(meanX), float(meanY), float(meanZ)),
-                                   'stdev' : (float(stdevX), float(stdevY), float(stdevZ)),
-                                   'count' : int(count),
-                                   'start_time': float(startTime),
-                                   'end_time' : float(endTime),
-                                   }
-        
+    if os.path.exists('trainInfo.dat'):
+        trainInfo = cPickle.load(open('trainInfo.dat', 'r'))
     else:
         print 'reading train.csv...'
         trainReader = csv.reader(open('train.csv', 'r'))
@@ -80,28 +85,20 @@ if __name__ == '__main__':
         for [T, X, Y, Z, DeviceId] in trainReader:
             if not trainDict.has_key(DeviceId):
                 trainDict[DeviceId] = []
-            trainDict[DeviceId].append((float(T), float(X), float(Y), float(Z)))
+            trainDict[DeviceId].append((float(T), int(float(X)), int(float(Y)), int(float(Z))))
         
         print 'calculate with train...'    
         for (DeviceId, acceleration) in trainDict.iteritems():
             trainInfo[DeviceId] = calculateInfo(acceleration)
+            trainInfo[DeviceId]['counter'] = countSequence(acceleration)
         
-        trainInfoFile = open('trainInfo.csv', 'w')
-        trainWriter = csv.writer(trainInfoFile)
-        for (DeviceId, value) in trainInfo.iteritems():
-            trainWriter.writerow([DeviceId] + list(value['mean']) + list(value['stdev']) + [value['count'], value['start_time'], value['end_time']])
+        trainInfoFile = open('trainInfo.dat', 'w')
+        cPickle.dump(trainInfo, trainInfoFile)
         trainInfoFile.close()
         
     testInfo = {}
-    if os.path.exists('testInfo.csv'):
-        testReader = csv.reader(open('testInfo.csv', 'r'))
-        for [SequenceId, meanX, meanY, meanZ, stdevX, stdevY, stdevZ, count, startTime, endTime] in testReader:
-            testInfo[SequenceId] = {'mean' : (float(meanX), float(meanY), float(meanZ)),
-                                    'stdev' : (float(stdevX), float(stdevY), float(stdevZ)),
-                                    'count' : int(count),
-                                    'start_time': float(startTime),
-                                    'end_time' : float(endTime),
-                                    }
+    if os.path.exists('testInfo.dat'):
+        testInfo = cPickle.load(open('testInfo.dat', 'r'))
     else:
         print 'reading test.csv...'
         testReader = csv.reader(open('test.csv', 'r'))
@@ -116,24 +113,26 @@ if __name__ == '__main__':
         print 'calculate with test...'
         for (SequenceId, acceleration) in testDict.iteritems():
             testInfo[SequenceId] = calculateInfo(acceleration)
+            testInfo[SequenceId]['mean'] = tuple([int(x) for x in testInfo[SequenceId]['mean']])
         
-        testInfoFile = open('testInfo.csv', 'w')
-        testWriter = csv.writer(testInfoFile)
-        for (SequenceId, value) in testInfo.iteritems():
-            testWriter.writerow([SequenceId] + list(value['mean']) + list(value['stdev']) + [value['count'], value['start_time'], value['end_time']])
+        
+        testInfoFile = open('testInfo.dat', 'w')
+        cPickle.dump(testInfo, testInfoFile)
         testInfoFile.close()
         
     global classifier
-    classifier = NaiveBayes(trainInfo)
+    classifier = NaiveBayes(trainInfo, (True, True, True))
     
     print 'reading question.csv...'
     questionReader = csv.reader(open('questions.csv', 'r'))
     questionReader.next()
     
-    submissionWriter = csv.writer(open('submisson.csv', 'w'))
+    submissionFile = open('submisson.csv', 'w')
+    submissionWriter = csv.writer(submissionFile)
     submissionWriter.writerow(['QuestionId', 'IsTrue'])
     
     print 'fucking busy...'
+    sys.stdout.write("\r")
     for [QuestionId, SequenceId, QuizDevice] in questionReader:
         if trainInfo[QuizDevice]['end_time'] > testInfo[SequenceId]['start_time']:
 #            print 'killed by timestamp '
@@ -141,9 +140,10 @@ if __name__ == '__main__':
         else:
             score = predict(testInfo[SequenceId]['mean'], QuizDevice)
         submissionWriter.writerow([QuestionId, score])
-#        print 'solved %s, %d' % (QuestionId, score)
+        sys.stdout.write("\rsolved %s / 90024" % (QuestionId))
+        sys.stdout.flush()
     
-    print 'done!'
+    submissionFile.close()
     
     
     
