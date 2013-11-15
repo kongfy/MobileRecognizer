@@ -40,7 +40,7 @@ def calculateStdev(Sequence, mean):
 
 def calculateInfo(Sequence):
     result = {}
-    result['mean'] = calculateCenter(Sequence)
+#    result['mean'] = calculateCenter(Sequence)
 #    result['stdev'] = calculateStdev(Sequence, result['mean'])
     result['count'] = len(Sequence)
     result['start_time'] = Sequence[0][0]
@@ -85,7 +85,11 @@ if __name__ == '__main__':
         for [T, X, Y, Z, DeviceId] in trainReader:
             if not trainDict.has_key(DeviceId):
                 trainDict[DeviceId] = []
-            trainDict[DeviceId].append((float(T), int(float(X)), int(float(Y)), int(float(Z))))
+            trainDict[DeviceId].append((float(T),
+                                        int(round(float(X))),
+                                        int(round(float(Y))),
+                                        int(round(float(Z))),
+                                        ))
         
         print 'calculate with train...'    
         for (DeviceId, acceleration) in trainDict.iteritems():
@@ -113,7 +117,7 @@ if __name__ == '__main__':
         print 'calculate with test...'
         for (SequenceId, acceleration) in testDict.iteritems():
             testInfo[SequenceId] = calculateInfo(acceleration)
-            testInfo[SequenceId]['mean'] = tuple([int(x) for x in testInfo[SequenceId]['mean']])
+            testInfo[SequenceId]['mean'] = tuple([int(round(x)) for x in calculateCenter(acceleration)])
         
         
         testInfoFile = open('testInfo.dat', 'w')
@@ -145,6 +149,7 @@ if __name__ == '__main__':
     
     submissionFile.close()
     
-    
+    sys.stdout.write("\n")
+    print "mession complate!"
     
     
