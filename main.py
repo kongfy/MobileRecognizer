@@ -12,7 +12,7 @@ from NaiveBayes import NaiveBayes
 def calculateCenter(Sequence):
     tX = tY = tZ = 0
     l = len(Sequence)
-    for (X, Y, Z) in Sequence:
+    for (T, X, Y, Z) in Sequence:
         tX += X
         tY += Y
         tZ += Z
@@ -24,7 +24,7 @@ def calculateCenter(Sequence):
 def calculateStdev(Sequence, mean):
     tX = tY = tZ = 0
     l = len(Sequence)
-    for (X, Y, Z) in Sequence:
+    for (T, X, Y, Z) in Sequence:
         tX += (X - mean[0]) ** 2
         tY += (Y - mean[1]) ** 2
         tZ += (Z - mean[2]) ** 2
@@ -41,6 +41,8 @@ def calculateInfo(Sequence):
     result['mean'] = calculateCenter(Sequence)
     result['stdev'] = calculateStdev(Sequence, result['mean'])
     result['count'] = len(Sequence)
+    result['start_time'] = Sequence[0][0]
+    result['end_time'] = Sequence[len(Sequence) - 1][0]
     
     return result
 
@@ -61,10 +63,12 @@ if __name__ == '__main__':
     trainInfo = {}
     if os.path.exists('trainInfo.csv'):
         trainReader = csv.reader(open('trainInfo.csv', 'r'))
-        for [DeviceId, meanX, meanY, meanZ, stdevX, stdevY, stdevZ, count] in trainReader:
+        for [DeviceId, meanX, meanY, meanZ, stdevX, stdevY, stdevZ, count, startTime, endTime] in trainReader:
             trainInfo[DeviceId] = {'mean' : (float(meanX), float(meanY), float(meanZ)),
                                    'stdev' : (float(stdevX), float(stdevY), float(stdevZ)),
-                                   'count' : int(count), 
+                                   'count' : int(count),
+                                   'start_time': float(startTime),
+                                   'end_time' : float(endTime),
                                    }
         
     else:
@@ -76,7 +80,7 @@ if __name__ == '__main__':
         for [T, X, Y, Z, DeviceId] in trainReader:
             if not trainDict.has_key(DeviceId):
                 trainDict[DeviceId] = []
-            trainDict[DeviceId].append((float(X), float(Y), float(Z)))
+            trainDict[DeviceId].append((float(T), float(X), float(Y), float(Z)))
         
         print 'calculate with train...'    
         for (DeviceId, acceleration) in trainDict.iteritems():
@@ -85,14 +89,19 @@ if __name__ == '__main__':
         trainInfoFile = open('trainInfo.csv', 'w')
         trainWriter = csv.writer(trainInfoFile)
         for (DeviceId, value) in trainInfo.iteritems():
-            trainWriter.writerow([DeviceId] + list(value['mean']) + list(value['stdev']) + [value['count']])
+            trainWriter.writerow([DeviceId] + list(value['mean']) + list(value['stdev']) + [value['count'], value['start_time'], value['end_time']])
         trainInfoFile.close()
         
-    testCenter = {}
-    if os.path.exists('testCenter.csv'):
-        testReader = csv.reader(open('testCenter.csv', 'r'))
-        for [SequenceId, X, Y, Z] in testReader:
-            testCenter[SequenceId] = (float(X), float(Y), float(Z))
+    testInfo = {}
+    if os.path.exists('testInfo.csv'):
+        testReader = csv.reader(open('testInfo.csv', 'r'))
+        for [SequenceId, meanX, meanY, meanZ, stdevX, stdevY, stdevZ, count, startTime, endTime] in testReader:
+            testInfo[SequenceId] = {'mean' : (float(meanX), float(meanY), float(meanZ)),
+                                    'stdev' : (float(stdevX), float(stdevY), float(stdevZ)),
+                                    'count' : int(count),
+                                    'start_time': float(startTime),
+                                    'end_time' : float(endTime),
+                                    }
     else:
         print 'reading test.csv...'
         testReader = csv.reader(open('test.csv', 'r'))
@@ -102,17 +111,17 @@ if __name__ == '__main__':
         for [T, X, Y, Z, SequenceId] in testReader:
             if not testDict.has_key(SequenceId):
                 testDict[SequenceId] = []
-            testDict[SequenceId].append((float(X), float(Y), float(Z)))
+            testDict[SequenceId].append((float(T), float(X), float(Y), float(Z)))
             
-        print 'calculate with test...'    
+        print 'calculate with test...'
         for (SequenceId, acceleration) in testDict.iteritems():
-            testCenter[SequenceId] = calculateCenter(acceleration)
+            testInfo[SequenceId] = calculateInfo(acceleration)
         
-        testCenterFile = open('testCenter.csv', 'w')
-        testWriter = csv.writer(testCenterFile)
-        for (SequenceId, value) in testCenter.iteritems():
-            testWriter.writerow([SequenceId] + list(value))
-        testCenterFile.close()
+        testInfoFile = open('testInfo.csv', 'w')
+        testWriter = csv.writer(testInfoFile)
+        for (SequenceId, value) in testInfo.iteritems():
+            testWriter.writerow([SequenceId] + list(value['mean']) + list(value['stdev']) + [value['count'], value['start_time'], value['end_time']])
+        testInfoFile.close()
         
     global classifier
     classifier = NaiveBayes(trainInfo)
@@ -121,12 +130,16 @@ if __name__ == '__main__':
     questionReader = csv.reader(open('questions.csv', 'r'))
     questionReader.next()
     
-    submissionWriter = csv.writer(open('submisson_naiveBayes.csv', 'w'))
+    submissionWriter = csv.writer(open('submisson.csv', 'w'))
     submissionWriter.writerow(['QuestionId', 'IsTrue'])
     
     print 'fucking busy...'
     for [QuestionId, SequenceId, QuizDevice] in questionReader:
-        score = predict(testCenter[SequenceId], QuizDevice)
+        if trainInfo[QuizDevice]['end_time'] > testInfo[SequenceId]['start_time']:
+#            print 'killed by timestamp '
+            score = -1
+        else:
+            score = predict(testInfo[SequenceId]['mean'], QuizDevice)
         submissionWriter.writerow([QuestionId, score])
 #        print 'solved %s, %d' % (QuestionId, score)
     
