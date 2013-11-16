@@ -8,8 +8,10 @@ import csv
 import os.path
 import math
 from NaiveBayes import NaiveBayes
+from Kmeans import Cluster
 import cPickle
 import sys
+import pprint
 
 def calculateCenter(Sequence):
     tX = tY = tZ = 0
@@ -40,8 +42,6 @@ def calculateStdev(Sequence, mean):
 
 def calculateInfo(Sequence):
     result = {}
-#    result['mean'] = calculateCenter(Sequence)
-#    result['stdev'] = calculateStdev(Sequence, result['mean'])
     result['count'] = len(Sequence)
     result['start_time'] = Sequence[0][0]
     result['end_time'] = Sequence[len(Sequence) - 1][0]
@@ -68,34 +68,37 @@ def predict(Sample, QuizDevice):
     count = 0
     for p in plist:
         if p < temp:
-            count = count + 1
+            count += 1
     return count
 
 if __name__ == '__main__':
     global trainInfo
     trainInfo = {}
+    
+    cluster = Cluster()
+    
     if os.path.exists('trainInfo.dat'):
-        trainInfo = cPickle.load(open('trainInfo.dat', 'r'))
+        trainInfoFile = open('trainInfo.dat', 'r')
+        trainInfo = cPickle.load(trainInfoFile)
+        trainInfoFile.close()
     else:
         print 'reading train.csv...'
         trainReader = csv.reader(open('train.csv', 'r'))
         trainReader.next()
-    
+        
         trainDict = {}
         for [T, X, Y, Z, DeviceId] in trainReader:
             if not trainDict.has_key(DeviceId):
                 trainDict[DeviceId] = []
-            trainDict[DeviceId].append((float(T),
-                                        int(round(float(X))),
-                                        int(round(float(Y))),
-                                        int(round(float(Z))),
-                                        ))
-        
-        print 'calculate with train...'    
+            (X, Y, Z) = cluster.trans((X, Y, Z))
+            trainDict[DeviceId].append((T, X, Y, Z))
+          
+        print 'calculate with train...'
         for (DeviceId, acceleration) in trainDict.iteritems():
             trainInfo[DeviceId] = calculateInfo(acceleration)
             trainInfo[DeviceId]['counter'] = countSequence(acceleration)
         
+        del trainDict
         trainInfoFile = open('trainInfo.dat', 'w')
         cPickle.dump(trainInfo, trainInfoFile)
         trainInfoFile.close()
@@ -113,13 +116,13 @@ if __name__ == '__main__':
             if not testDict.has_key(SequenceId):
                 testDict[SequenceId] = []
             testDict[SequenceId].append((float(T), float(X), float(Y), float(Z)))
-            
+        
         print 'calculate with test...'
         for (SequenceId, acceleration) in testDict.iteritems():
             testInfo[SequenceId] = calculateInfo(acceleration)
-            testInfo[SequenceId]['mean'] = tuple([int(round(x)) for x in calculateCenter(acceleration)])
-        
-        
+            testInfo[SequenceId]['mean'] = calculateCenter(acceleration)
+                
+        del testDict
         testInfoFile = open('testInfo.dat', 'w')
         cPickle.dump(testInfo, testInfoFile)
         testInfoFile.close()
@@ -142,7 +145,8 @@ if __name__ == '__main__':
 #            print 'killed by timestamp '
             score = -1
         else:
-            score = predict(testInfo[SequenceId]['mean'], QuizDevice)
+            sampleOfSequence = cluster.trans(testInfo[SequenceId]['mean'])
+            score = predict(sampleOfSequence, QuizDevice)
         submissionWriter.writerow([QuestionId, score])
         sys.stdout.write("\rsolved %s / 90024" % (QuestionId))
         sys.stdout.flush()
