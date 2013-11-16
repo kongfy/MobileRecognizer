@@ -10,38 +10,27 @@ import math
 from NaiveBayes import NaiveBayes
 import cPickle
 import sys
+import datetime
 
 def calculateCenter(Sequence):
-    tX = tY = tZ = 0
+    tT = tX = tY = tZ = 0
     l = len(Sequence)
     for (T, X, Y, Z) in Sequence:
+        tT += T
         tX += X
         tY += Y
         tZ += Z
+    tT /= l
     tX /= l
     tY /= l
     tZ /= l
-    return (tX, tY, tZ)
-
-def calculateStdev(Sequence, mean):
-    tX = tY = tZ = 0
-    l = len(Sequence)
-    for (T, X, Y, Z) in Sequence:
-        tX += (X - mean[0]) ** 2
-        tY += (Y - mean[1]) ** 2
-        tZ += (Z - mean[2]) ** 2
-    tX /= l;
-    tY /= l;
-    tZ /= l;
-    tX = math.sqrt(tX)
-    tY = math.sqrt(tY)
-    tZ = math.sqrt(tZ)
-    return (tX, tY, tZ)
+    
+    TZ = timezone(tT)
+    return (tX, tY, tZ, TZ)
 
 def calculateInfo(Sequence):
     result = {}
-#    result['mean'] = calculateCenter(Sequence)
-#    result['stdev'] = calculateStdev(Sequence, result['mean'])
+    
     result['count'] = len(Sequence)
     result['start_time'] = Sequence[0][0]
     result['end_time'] = Sequence[len(Sequence) - 1][0]
@@ -52,12 +41,14 @@ def countSequence(Sequence):
     cX = {}
     cY = {}
     cZ = {}
-    for (T, X, Y, Z) in Sequence:
+    cT = {}
+    for (T, X, Y, Z, TZ) in Sequence:
         cX[X] = cX.get(X, 0) + 1
         cY[Y] = cY.get(Y, 0) + 1
         cZ[Z] = cZ.get(Z, 0) + 1
-    
-    return (cX, cY, cZ)
+        cT[TZ] = cT.get(TZ, 0) + 1
+        
+    return (cX, cY, cZ, cT)
 
 def predict(Sample, QuizDevice):
     plist = []
@@ -71,6 +62,10 @@ def predict(Sample, QuizDevice):
             count = count + 1
     return count
 
+def timezone(timestamp):
+    temp = int(float(timestamp)/1000)
+    return datetime.datetime.fromtimestamp(temp).hour
+    
 if __name__ == '__main__':
     global trainInfo
     trainInfo = {}
@@ -89,9 +84,10 @@ if __name__ == '__main__':
                                         int(round(float(X))),
                                         int(round(float(Y))),
                                         int(round(float(Z))),
+                                        timezone(T)
                                         ))
         
-        print 'calculate with train...'    
+        print 'calculate with train...'
         for (DeviceId, acceleration) in trainDict.iteritems():
             trainInfo[DeviceId] = calculateInfo(acceleration)
             trainInfo[DeviceId]['counter'] = countSequence(acceleration)
@@ -125,7 +121,7 @@ if __name__ == '__main__':
         testInfoFile.close()
         
     global classifier
-    classifier = NaiveBayes(trainInfo, (True, True, True))
+    classifier = NaiveBayes(trainInfo, (True, True, True, True))
     
     print 'reading question.csv...'
     questionReader = csv.reader(open('questions.csv', 'r'))
